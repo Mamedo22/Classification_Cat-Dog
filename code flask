@@ -1,0 +1,61 @@
+from flask import Flask, render_template, request
+from PIL import Image
+import numpy as np
+import tensorflow as tf
+import os
+
+
+# Créer une application Flask
+app = Flask(__name__)
+
+# Télécharger le model
+model = tf.keras.models.load_model('cats_dogs_model.h5')
+
+# Page de démarrage
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Fonction de prédiction d'image
+@app.route('/predict', methods=['POST'])
+def predict():
+    # Assurez-vous que le fichier existe
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image file part'}), 400
+    
+    file = request.files['image']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    # Enregistrez l'image dans un dossier temporaire
+    filepath = os.path.join('static', file.filename)
+    file.save(filepath)
+
+   # Traitement de l'image
+    img = Image.open(filepath)
+
+    # Changez la taille
+    img = img.resize((64, 64))
+
+    # Convertir l'image en matrice numpy
+    img_array = np.array(img)
+
+    # Normalize 
+    img_array = img_array / 255.0
+
+   # Ajoutez une dimension supplémentaire pour que le modèle puisse gérer l'image
+    img_array = np.expand_dims(img_array, axis=0)
+
+
+   # Prédiction d'image
+    predictions = model.predict(img_array)
+
+   # Obtenir la catégorie attendue
+    predicted_class = "C'est un chien"  if predictions[0][0] > 0.5 else "C'est un chat"
+
+    return render_template('index.html', image_path=file.filename, prediction=predicted_class)
+
+# Lancer l'application
+if __name__ == '__main__':
+    app.run(debug=True)
